@@ -1,17 +1,16 @@
-import requests
 import json
-from collections import Counter
-from tabulate import tabulate
-import click
-from joblib import Memory, Parallel, delayed
-from brownie import Contract, chain, web3
-from web3.middleware.filter import block_ranges
-from toolz import concat, unique, valmap, keymap
-from tqdm import tqdm
-from eth_utils import event_abi_to_log_topic, encode_hex, to_checksum_address
 from collections import defaultdict
 
+import requests
+from brownie import Contract, chain, web3
+from eth_utils import encode_hex, event_abi_to_log_topic, to_checksum_address
+from joblib import Memory, Parallel, delayed
+from toolz import concat, keymap, valmap
+from tqdm import tqdm
+from web3.middleware.filter import block_ranges
+
 memory = Memory('cache', verbose=0)
+
 ANCIENT_POOLS = {
     '0x0001FB050Fe7312791bF6475b96569D83F695C9f': 1,  # ycrv
     '0x033E52f513F9B98e129381c6708F9faA2DEE5db5': 2,  # yfi/dai bpt
