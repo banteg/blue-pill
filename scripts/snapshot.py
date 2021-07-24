@@ -79,7 +79,7 @@ def get_ygift_users():
     contract = web3.eth.contract(str(ygift), abi=ygift.abi)
     gift_minted = contract.events.GiftMinted()
     topics = [encode_hex(event_abi_to_log_topic(gift_minted.abi))]
-    for log in get_logs_batched(str(ygift), topics, YGIFT_DEPLOY_BLOCK, chain.height):
+    for log in get_logs_batched(str(ygift), topics, YGIFT_DEPLOY_BLOCK, SNAPSHOT_BLOCK):
         event = gift_minted.processLog(log)
         users['senders'].add(event.args['from'])
         users['receivers'].add(event.args['to'])
@@ -95,7 +95,7 @@ def get_ancient_pool_stakers():
     topics = [encode_hex(event_abi_to_log_topic(staked.abi))]
 
     for log in get_logs_batched(
-        list(ANCIENT_POOLS), topics, EARLIEST_BLOCK, chain.height
+        list(ANCIENT_POOLS), topics, EARLIEST_BLOCK, SNAPSHOT_BLOCK
     ):
         event = staked.processLog(log)
         stakers[event.address].add(event.args['user'])
