@@ -19,6 +19,7 @@ ANCIENT_POOLS = {
     '0xBa37B002AbaFDd8E89a1995dA52740bbC013D992': 5,  # governance v2
 }
 EARLIEST_BLOCK = 10_476_729
+SNAPSHOT_BLOCK = 12_843_076  # yfi deploy + 365 days
 YGIFT_DEPLOY_BLOCK = 11_287_863
 YEARN_COORDINAPE_CIRCLES = {1, 2, 3}
 
@@ -50,10 +51,15 @@ def get_logs_batched(address, topics, from_block, to_block, batch_size=10_000):
 
 @memory.cache()
 def get_snapshot_voters():
-    query = '''{ votes(first: 100000, where: {space_in: ["yearn", "ybaby.eth"]}) { voter } }'''
+    query = '''{ votes(first: 100000, where: {space_in: ["yearn", "ybaby.eth"]}) { voter created } }'''
     response = requests.post('https://hub.snapshot.page/graphql', json={'query': query})
+    cutoff_timestamp = chain[SNAPSHOT_BLOCK].timestamp
 
-    return set(vote['voter'] for vote in response.json()['data']['votes'])
+    return set(
+        vote['voter']
+        for vote in response.json()['data']['votes']
+        if vote['created'] <= cutoff_timestamp
+    )
 
 
 @memory.cache()
