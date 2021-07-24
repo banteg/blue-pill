@@ -128,14 +128,16 @@ def main():
         "04 The Giver": coordinape_users | ygift_users,
     }
     rare = {
-        "05 The Lunar Guild": intersect_union(common, 2),
-        "06 The Sun's Work": intersect_union(common, 3),
+        "05 The Lunar Guild": intersect_union(common, 3),
+        "06 The Sun's Work": intersect_union(common, 2) & (ygift_users | coordinape_users),
         "07 The Celestial Sphere": intersect_union(common, 4),
     }
     common.update(rare)
 
+    total = len(list(concat(common.values())))
+
     for key in common:
-        print(f'{key:24} {len(common[key])}')
+        print(f'{key:24} {len(common[key]):10} {len(common[key]) / total:10.2%}')
 
     with open('blue-pill.json', 'wt') as f:
         json.dump(valmap(sorted, common), f, indent=2)
