@@ -1,5 +1,7 @@
 import json
 from collections import defaultdict
+from functools import reduce
+from itertools import combinations
 
 import requests
 from brownie import Contract, chain, web3
@@ -12,11 +14,11 @@ from web3.middleware.filter import block_ranges
 memory = Memory('cache', verbose=0)
 
 ANCIENT_POOLS = {
-    '0x0001FB050Fe7312791bF6475b96569D83F695C9f': 1,  # ycrv
-    '0x033E52f513F9B98e129381c6708F9faA2DEE5db5': 2,  # yfi/dai bpt
-    '0x3A22dF48d84957F907e67F4313E3D43179040d6E': 3,  # yfi/ycrv bpt, governance v1
-    '0xb01419E74D8a2abb1bbAD82925b19c36C191A701': 4,  # rewards
-    '0xBa37B002AbaFDd8E89a1995dA52740bbC013D992': 5,  # governance v2
+    '0x0001FB050Fe7312791bF6475b96569D83F695C9f': 'ycrv',
+    '0x033E52f513F9B98e129381c6708F9faA2DEE5db5': 'yfi/dai',
+    '0x3A22dF48d84957F907e67F4313E3D43179040d6E': 'yfi/ycrv',
+    '0xb01419E74D8a2abb1bbAD82925b19c36C191A701': 'rewards',
+    '0xBa37B002AbaFDd8E89a1995dA52740bbC013D992': 'ygov',
 }
 EARLIEST_BLOCK = 10_476_729
 SNAPSHOT_BLOCK = 12_843_076  # yfi deploy + 365 days
@@ -74,15 +76,15 @@ def get_coordinape_users():
 
 
 def get_ygift_users():
-    users = defaultdict(set)
+    users = set()
     ygift = Contract('0x020171085bcd43b6FD36aD8C95aD61848B1211A2')
     contract = web3.eth.contract(str(ygift), abi=ygift.abi)
     gift_minted = contract.events.GiftMinted()
     topics = [encode_hex(event_abi_to_log_topic(gift_minted.abi))]
     for log in get_logs_batched(str(ygift), topics, YGIFT_DEPLOY_BLOCK, SNAPSHOT_BLOCK):
         event = gift_minted.processLog(log)
-        users['senders'].add(event.args['from'])
-        users['receivers'].add(event.args['to'])
+        users.add(event.args['from'])
+        users.add(event.args['to'])
 
     return users
 
@@ -103,37 +105,37 @@ def get_ancient_pool_stakers():
     return stakers
 
 
+def intersect_union(data, num):
+    intersections = [
+        reduce(set.intersection, [set(data[key]) for key in keys])
+        for keys in combinations(data, num)
+    ]
+
+    return reduce(set.union, intersections)
+
+
 def main():
-    # 1. voters on snapshot.org
     snapshot_voters = get_snapshot_voters()
-    print(len(snapshot_voters), 'snapshot voters')
-
-    # 2. yearn coordinape circles
     coordinape_users = get_coordinape_users()
-    print(len(coordinape_users), 'users from coorinape circles')
-
-    # 3. ygift senders and recipients
-    ygift = get_ygift_users()
-    ygift_users = set(concat(ygift.values()))
-    print(len(ygift_users), 'ygift users')
-
-    # 4. stakers in ancient pools
+    ygift_users = get_ygift_users()
     ancient_pools = get_ancient_pool_stakers()
     pools = keymap(ANCIENT_POOLS.get, ancient_pools)
-    print(len(set(concat(pools.values()))), 'ancient pool stakers')
-    print(valmap(len, pools))
 
-    days = {
-        1: pools[1],
-        2: pools[2],
-        3: pools[3],
-        4: pools[4],
-        5: pools[5],
-        6: snapshot_voters,
-        7: coordinape_users | ygift_users,
+    common = {
+        "01 The Farmer": pools['ycrv'] | pools['yfi/dai'] | pools['rewards'],
+        "02 The Staker": pools['yfi/ycrv'] | pools['ygov'],
+        "03 The Voter": snapshot_voters,
+        "04 The Giver": coordinape_users | ygift_users,
     }
+    rare = {
+        "05 The Lunar Guild": intersect_union(common, 2),
+        "06 The Sun's Work": intersect_union(common, 3),
+        "07 The Celestial Sphere": intersect_union(common, 4),
+    }
+    common.update(rare)
 
-    print(valmap(len, days))
+    for key in common:
+        print(f'{key:24} {len(common[key])}')
 
     with open('blue-pill.json', 'wt') as f:
-        json.dump(valmap(sorted, days), f, indent=2)
+        json.dump(valmap(sorted, common), f, indent=2)
